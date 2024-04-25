@@ -8,8 +8,8 @@ This is a Python script for plotting in real time data of the MPU9250 which are 
 Notes (Homer, 2024-4-24): compatible with pyqtgraph 0.12.0, numpy 1.26.4
 to downgrade a python site package version, use command:
 pip install --user --force-reinstall --index-url https://pypi.python.org/simple pyqtgraph==0.11.0
-
 """
+
 
 import serial
 import time
@@ -24,9 +24,10 @@ import PyQt5
 pg.setConfigOption('background','w')
 pg.setConfigOption('foreground', 'k')
 ##initialization of Qt
-app = QtGui.QApplication([])
+app = QtGui.QApplication([])  
 ## Define a top-level widget to hold everything
 w = QtGui.QWidget()
+
 w.setWindowTitle('MPU9250 features acquisition')
 #w.resize(1366,768)
 wb = QtGui.QWidget(w)
@@ -43,6 +44,7 @@ def clicked():
         QtGui.QLineEdit.setText(text,'running...')
 
 def Quit():
+    #output_file.close()
     w.close()
 
 k = 1    
@@ -85,7 +87,7 @@ listw = pyqtgraph.console.ConsoleWidget(namespace=namespace, text=texts)
 ## Create a grid layout to manage the widgets size and position
 layout = QtGui.QGridLayout()
 wb.setLayout(layout)
-wb.setFixedWidth(w.width()/3)
+wb.setFixedWidth(int(w.width()/4))  ## converting w.width into int to avode error; w.width/4 tuning the grid to have 4 columns
 
 layout1 = QtGui.QGridLayout()
 w.setLayout(layout1)
@@ -95,7 +97,7 @@ layout.addWidget(btn2, 1, 0)
 layout.addWidget(btn3, 2, 0)
 layout.addWidget(text, 3, 0) # text edit goes in middle-left
 layout.addWidget(listw, 4, 0) # list widget goes in bottom-left
-layout1.addWidget(wb, 0,0)# plot goes on right side, spanning 3 rows
+layout1.addWidget(wb, 0,0)# plot goes on right side, spanning 4 rows
 layout1.addWidget(win, 0,1)
 ## Display the widget as a new window
 w.show()
@@ -111,14 +113,20 @@ lr23 = pg.LinearRegionItem(values=[30, 80])
 lr31 = pg.LinearRegionItem(values=[30, 80])
 lr32 = pg.LinearRegionItem(values=[30, 80])
 lr33 = pg.LinearRegionItem(values=[30, 80])
+## adding another column to the right
+lr41 = pg.LinearRegionItem(values=[30, 80])
+lr42 = pg.LinearRegionItem(values=[30, 80])
+lr43 = pg.LinearRegionItem(values=[30, 80])
 
-#the idea of crolling plot is to define a matrix of data with fix length and to
+#the idea of scrolling plot is to define a matrix of data with fix length and to
 #update it each time you receive data
 
 #here the length is set to 300. 3 means the 3-dimension. 
 data1 = np.zeros((3,300)); #contains acc_x, acc_y and acc_z 
 data2 = np.zeros((3,300)); #contains gyr_x, gyr_y and gyr_z
 data3 = np.zeros((3,300)); #contains mag_x, mag_y and mag_z
+# adding euler angles data
+data4 = np.zeros((3,300)); #contains roll, pitch, yaw
 
 p11 = win.addPlot()
 p11.addLegend(offset=(10,10))
@@ -160,20 +168,38 @@ p33 = win.addPlot()
 p33.addLegend(offset=(10,10))
 p33.addItem(lr33,name='region33')
 
+## adding another column of subplots to the right of the window
+win.nextRow()
+
+p41 = win.addPlot()
+p41.addLegend(offset=(10,10))
+p41.addItem(lr41,name='region41')
+p42 = win.addPlot()
+p42.addLegend(offset=(10,10))
+p42.addItem(lr42,name='region32')
+p43 = win.addPlot()
+p43.addLegend(offset=(10,10))
+p43.addItem(lr43,name='region33')
+
+
 curve11 = p11.plot(data1[0],pen = (0,3),name = 'acc[x]')
-curve12 = p12.plot(data2[0],pen = (0,3),name = 'gyr[x]')
-curve13 = p13.plot(data3[0],pen = (0,3),name = 'mag[x]')
+curve12 = p12.plot(data1[1],pen = (0,3),name = 'acc[y]')
+curve13 = p13.plot(data1[2],pen = (0,3),name = 'acc[z]')
 
-curve21 = p21.plot(data1[1],pen = (1,3),name = 'acc[y]')
+curve21 = p21.plot(data2[0],pen = (1,3),name = 'gyr[x]')
 curve22 = p22.plot(data2[1],pen = (1,3),name = 'gyr[y]')
-curve23 = p23.plot(data3[1],pen = (1,3),name = 'mag[y]')
+curve23 = p23.plot(data2[2],pen = (1,3),name = 'gyr[z]')
 
-curve31 = p31.plot(data1[2],pen = (2,3),name = 'acc[z]')
-curve32 = p32.plot(data2[2],pen = (2,3),name = 'gyr[z]')
+curve31 = p31.plot(data3[0],pen = (2,3),name = 'mag[x]')
+curve32 = p32.plot(data3[1],pen = (2,3),name = 'mag[y]')
 curve33 = p33.plot(data3[2],pen = (2,3),name = 'mag[z]')
 
+curve41 = p41.plot(data4[0],pen = (3,3),name = 'roll')
+curve42 = p42.plot(data4[1],pen = (3,3),name = 'pitch')
+curve43 = p43.plot(data4[2],pen = (3,3),name = 'yaw')
+
 com = 'COM3'
-speed = 19200
+speed = 115200
 start = time.time()
 try:
     serie = serial.Serial(com,speed)
@@ -182,15 +208,17 @@ except:
     exit(0)
 
 tps = np.zeros(300) #you need time to, the same lenght as data
+
 if(not(serie.readable())):
     print("unable to read available value on port\n"+com)
 def update():
-    global data1, curve11,curve12,curve13,data2,curve21,curve22,curve23,data3,curve31,curve32,curve33
+    global data1, curve11,curve12,curve13,data2,curve21,curve22,curve23,data3,curve31,curve32,curve33, data4, curve41, curve42, curve43
     line = str(serie.readline(),'utf-8')
     if(not(pause)):
         acc = []
         gyr = []
         mag = []
+        rpy = []
         #print(line)
         line = line.split("\t")
         #for each line I collect data like this "acc_x acc_y acc_z gyr_x ... mag_z"
@@ -198,27 +226,40 @@ def update():
         acc = tab[0:3] #read and store the 3 values of acc according to how you send your data from arduino
         gyr = tab[3:6] #read the 3 values of gyr
         mag = tab[6:9] #read the 3 values of mag
+        rpy = tab[9:12] #read roll, pitch and yaw
         tps[:-1] = tps[1:]
         tps[-1] = time.time()-start
         data1[:,:-1] = data1[:,1:]  # shift data in the array one sample left
                     # (see also: np.roll)
         data2[:,:-1] = data2[:,1:]
         data3[:,:-1] = data3[:,1:]
+        data4[:,:-1] = data4[:,1:]
         
         data1[:,-1] = acc
         data2[:,-1] = gyr
         data3[:,-1] = mag
+        data4[:,-1] = rpy
+
         curve11.setData(data1[0])
-        curve12.setData(data2[0])
-        curve13.setData(data3[0])
+        curve12.setData(data1[1])
+        curve13.setData(data1[2])
         
-        curve21.setData(data1[1])
+        curve21.setData(data2[0])
         curve22.setData(data2[1])
-        curve23.setData(data3[1])
+        curve23.setData(data2[2])
         
-        curve31.setData(data1[2])
-        curve32.setData(data2[2])
+        curve31.setData(data3[0])
+        curve32.setData(data3[1])
         curve33.setData(data3[2])
+
+        curve41.setData(data4[0])
+        curve42.setData(data4[1])
+        curve43.setData(data4[2])
+
+        # Write the current data to the output file
+        #current_time = tps[-1]
+        #line_data = f"{current_time},{data1[0]},{data1[1]},{data1[2]},{data2[0]},{data2[1]},{data2[2]},{data3[0]},{data3[1]},{data3[2]},{data4[0]},{data4[1]},{data4[2]}\n"
+        #output_file.write(line_data)
 
 
 timer = pg.QtCore.QTimer()
@@ -229,15 +270,11 @@ timer.start(5)
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
     import sys
+    #output_file = open("sensor_data.csv", "w")
+    #output_file.write("time,accelx,accely,accelz,gyrox,gyroy,gyroz,magx,magy,magz,roll,pitch,yaw\n")
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
 
-
-##    acc = np.array(acc)
-##    gyr = np.array(gyr)
-##    mag = np.array(mag)
-##plt.plot(tps,acc[:,0])
-##plt.show()
-##serie.close()
+        
     
             
