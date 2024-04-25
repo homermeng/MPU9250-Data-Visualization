@@ -4,8 +4,12 @@ This is a Python script for plotting in real time data of the MPU9250 which are 
 @contact : Follow me on github.com/Sanahm/
 @licence : Under GNU licence
 @date : 30/04/2017
-"""
 
+Notes (Homer, 2024-4-24): compatible with pyqtgraph 0.12.0, numpy 1.26.4
+to downgrade a python site package version, use command:
+pip install --user --force-reinstall --index-url https://pypi.python.org/simple pyqtgraph==0.11.0
+
+"""
 
 import serial
 import time
